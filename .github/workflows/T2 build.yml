@@ -49,7 +49,7 @@ jobs:
           echo -e "4. 如果单独安装 ssr 与依赖，\`rm -rf {*passwall*,*bypass*}\`\n" >> release.txt
 
       - name: Upload packages
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.8.8
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           artifacts: ${{ matrix.arch }}-${{ matrix.sdk }}.zip,bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
@@ -62,15 +62,37 @@ jobs:
           prerelease: false
 
       - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v0.2.0
+        uses: actions/github-script@v6
         with:
-          retain_days: 10
-          keep_minimum_runs: 2
+          script: |
+            const runs = await github.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            const run_ids = runs.data.workflow_runs.map(run => run.id);
+            for (const run_id of run_ids.slice(10)) {
+              await github.actions.deleteWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id
+              });
+            }
     
       - name: Remove old Releases
-        uses: dev-drprasad/delete-older-releases@v1
+        uses: actions/github-script@v6
         with:
-          keep_latest: 60
-          delete_tags: true
-        env:
-           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          script: |
+            const releases = await github.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            const release_ids = releases.data.map(release => release.id);
+            for (const release_id of release_ids.slice(10)) {
+              await github.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id
+              });
+            }
