@@ -65,34 +65,38 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const runs = await github.actions.listWorkflowRunsForRepo({
+            const runs = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               per_page: 100
             });
             const run_ids = runs.data.workflow_runs.map(run => run.id);
             for (const run_id of run_ids.slice(10)) {
-              await github.actions.deleteWorkflowRun({
+              await github.rest.actions.deleteWorkflowRun({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 run_id
               });
             }
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
     
       - name: Remove old Releases
         uses: actions/github-script@v6
         with:
           script: |
-            const releases = await github.repos.listReleases({
+            const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
               per_page: 100
             });
             const release_ids = releases.data.map(release => release.id);
             for (const release_id of release_ids.slice(10)) {
-              await github.repos.deleteRelease({
+              await github.rest.repos.deleteRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release_id
               });
             }
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
