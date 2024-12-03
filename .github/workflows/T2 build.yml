@@ -25,32 +25,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug Path and Permissions
+      - name: Debug Directory and Permissions
         run: |
-          echo "Checking directory structure and permissions..."
-          ls -ld /home/runner/work/Smal/Smal || echo "Path not found"
-          ls -ld /home/runner/work/Smal/Smal/.. || echo "Parent path not found"
-          whoami
-          pwd
+          echo "Current working directory: $(pwd)"
+          echo "Workspace directory content:"
+          ls -al ${{ github.workspace }}
 
-      # 构建步骤
       - name: Build
         uses: kenzok8/gh-action-sdk@hash
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          PACKAGES: luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-bypass brook hysteria ipt2socks pdnsd-alt redsocks2 shadow-tls trojan tuic-client xray-plugin v2ray-core v2ray-geodata naiveproxy
+          PACKAGES: >
+            luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-bypass
+            brook hysteria ipt2socks pdnsd-alt redsocks2 shadow-tls trojan
+            tuic-client xray-plugin v2ray-core v2ray-geodata naiveproxy
           NO_REFRESH_CHECK: true
           IGNORE_ERRORS: true
 
-      # 存储构建产物
       - name: Store packages
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.arch }}-${{ matrix.sdk }}
           path: bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
 
-      # 上传构建产物
       - name: Upload packages
         uses: ncipollo/release-action@v1.8.8
         with:
