@@ -8,51 +8,51 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.arch }}-${{ matrix.sdk }}
+    name: build ${{ matrix.arch }}-${{ matrix.sdk }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        sdk: [23.05.2]
-        arch: [aarch64_cortex-a53, x86_64]
+        sdk:
+          - 23.05.2
+        arch:
+          - aarch64_cortex-a53
+          - x86_64
 
     steps:
+      # 检出代码仓库
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
+      # 调整权限（添加调试信息和容错处理）
+      - name: Adjust Permissions
+        run: |
+          echo "Checking current permissions..."
+          ls -ld /home/runner/work/Smal/Smal
+          ls -ld /home/runner/work/Smal/Smal/..
+          echo "Attempting to adjust permissions..."
+          sudo chown -R $USER:$USER /home/runner/work/Smal/Smal || echo "Permission adjustment failed, continuing..."
+        continue-on-error: true
+
+      # 执行构建
       - name: Build
         uses: kenzok8/gh-action-sdk@hash
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          PACKAGES: |
-            luci-app-passwall
-            luci-app-passwall2
-            luci-app-ssr-plus
-            luci-app-bypass
-            brook
-            hysteria
-            ipt2socks
-            pdnsd-alt
-            redsocks2
-            shadow-tls
-            trojan
-            tuic-client
-            xray-plugin
-            v2ray-core
-            v2ray-geodata
-            naiveproxy
+          PACKAGES: luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-bypass brook hysteria ipt2socks pdnsd-alt redsocks2 shadow-tls trojan tuic-client xray-plugin v2ray-core v2ray-geodata naiveproxy
           NO_REFRESH_CHECK: true
           IGNORE_ERRORS: true
-        continue-on-error: true
 
+      # 存储构建产物
       - name: Store packages
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.arch }}-${{ matrix.sdk }}
           path: bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
 
+      # 压缩文件并生成说明
       - name: Zip packages
         run: |
           zip -j ${{ matrix.arch }}-${{ matrix.sdk }}.zip bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
@@ -62,6 +62,7 @@ jobs:
           echo -e "3. 默认压缩包里包含 ssr、passwall、bypass、passwall2 插件\n" >> release.txt
           echo -e "4. 如果单独安装 ssr 与依赖，\`rm -rf {*passwall*,*bypass*}\`\n" >> release.txt
 
+      # 上传构建产物
       - name: Upload packages
         uses: ncipollo/release-action@v1.8.8
         with:
@@ -75,49 +76,44 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Clean workflow runs
+      # 删除旧的 Workflow Runs
+      - name: Delete workflow runs
         uses: actions/github-script@v6
         with:
           script: |
-            const maxCount = 10;
             const runs = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              per_page: 100,
+              per_page: 100
             });
             const run_ids = runs.data.workflow_runs.map(run => run.id);
-            if (run_ids.length > maxCount) {
-              for (const run_id of run_ids.slice(maxCount)) {
-                try {
-                  await github.rest.actions.deleteWorkflowRun({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    run_id,
-                  });
-                  console.log(`Deleted workflow run ID: ${run_id}`);
-                } catch (error) {
-                  console.error(`Error deleting workflow run ID: ${run_id}, ${error.message}`);
-                }
-              }
+            for (const run_id of run_ids.slice(10)) {
+              await github.rest.actions.deleteWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id
+              });
             }
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
+      # 删除旧的 Releases
       - name: Remove old Releases
         uses: actions/github-script@v6
         with:
           script: |
-            const maxCount = 10;
             const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              per_page: 100,
+              per_page: 100
             });
             const release_ids = releases.data.map(release => release.id);
-            if (release_ids.length > maxCount) {
-              for (const release_id of release_ids.slice(maxCount)) {
-                try {
-                  await github.rest.repos.deleteRelease({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    release_id
+            for (const release_id of release_ids.slice(10)) {
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id
+              });
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
