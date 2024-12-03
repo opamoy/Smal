@@ -8,16 +8,13 @@ on:
 
 jobs:
   build:
-    name: build ${{ matrix.arch }}-${{ matrix.sdk }}
+    name: Build ${{ matrix.arch }}-${{ matrix.sdk }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        sdk:
-          - 23.05.2
-        arch:
-          - aarch64_cortex-a53
-          - x86_64
+        sdk: [23.05.2]
+        arch: [aarch64_cortex-a53, x86_64]
 
     steps:
       - uses: actions/checkout@v2
@@ -29,9 +26,26 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
-          PACKAGES: luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-bypass brook hysteria ipt2socks pdnsd-alt redsocks2 shadow-tls trojan tuic-client xray-plugin v2ray-core v2ray-geodata naiveproxy
+          PACKAGES: |
+            luci-app-passwall
+            luci-app-passwall2
+            luci-app-ssr-plus
+            luci-app-bypass
+            brook
+            hysteria
+            ipt2socks
+            pdnsd-alt
+            redsocks2
+            shadow-tls
+            trojan
+            tuic-client
+            xray-plugin
+            v2ray-core
+            v2ray-geodata
+            naiveproxy
           NO_REFRESH_CHECK: true
           IGNORE_ERRORS: true
+        continue-on-error: true
 
       - name: Store packages
         uses: actions/upload-artifact@v3
@@ -61,42 +75,49 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Delete workflow runs
+      - name: Clean workflow runs
         uses: actions/github-script@v6
         with:
           script: |
+            const maxCount = 10;
             const runs = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              per_page: 100
+              per_page: 100,
             });
             const run_ids = runs.data.workflow_runs.map(run => run.id);
-            for (const run_id of run_ids.slice(10)) {
-              await github.rest.actions.deleteWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id
-              });
+            if (run_ids.length > maxCount) {
+              for (const run_id of run_ids.slice(maxCount)) {
+                try {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id,
+                  });
+                  console.log(`Deleted workflow run ID: ${run_id}`);
+                } catch (error) {
+                  console.error(`Error deleting workflow run ID: ${run_id}, ${error.message}`);
+                }
+              }
             }
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-    
+
       - name: Remove old Releases
         uses: actions/github-script@v6
         with:
           script: |
+            const maxCount = 10;
             const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              per_page: 100
+              per_page: 100,
             });
             const release_ids = releases.data.map(release => release.id);
-            for (const release_id of release_ids.slice(10)) {
-              await github.rest.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id
-              });
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+            if (release_ids.length > maxCount) {
+              for (const release_id of release_ids.slice(maxCount)) {
+                try {
+                  await github.rest.repos.deleteRelease({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    release_id
