@@ -20,22 +20,18 @@ jobs:
           - x86_64
 
     steps:
-      # 检出代码仓库
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      # 调整权限（添加调试信息和容错处理）
-      - name: Adjust Permissions
+      # 调试权限状态
+      - name: Debug Permissions
         run: |
-          echo "Checking current permissions..."
+          echo "Listing permissions..."
           ls -ld /home/runner/work/Smal/Smal
           ls -ld /home/runner/work/Smal/Smal/..
-          echo "Attempting to adjust permissions..."
-          sudo chown -R $USER:$USER /home/runner/work/Smal/Smal || echo "Permission adjustment failed, continuing..."
-        continue-on-error: true
 
-      # 执行构建
+      # 构建
       - name: Build
         uses: kenzok8/gh-action-sdk@hash
         env:
@@ -52,7 +48,7 @@ jobs:
           name: ${{ matrix.arch }}-${{ matrix.sdk }}
           path: bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
 
-      # 压缩文件并生成说明
+      # 压缩并生成说明
       - name: Zip packages
         run: |
           zip -j ${{ matrix.arch }}-${{ matrix.sdk }}.zip bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
@@ -75,45 +71,3 @@ jobs:
           name: Release ${{ github.run_number }} for ${{ matrix.arch }}-${{ matrix.sdk }}
           draft: false
           prerelease: false
-
-      # 删除旧的 Workflow Runs
-      - name: Delete workflow runs
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const runs = await github.rest.actions.listWorkflowRunsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-            const run_ids = runs.data.workflow_runs.map(run => run.id);
-            for (const run_id of run_ids.slice(10)) {
-              await github.rest.actions.deleteWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id
-              });
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-
-      # 删除旧的 Releases
-      - name: Remove old Releases
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const releases = await github.rest.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-            const release_ids = releases.data.map(release => release.id);
-            for (const release_id of release_ids.slice(10)) {
-              await github.rest.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id
-              });
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
